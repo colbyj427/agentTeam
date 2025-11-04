@@ -68,40 +68,6 @@ class BaseAgent(ABC):
         # that have access to the database client
         pass
 
-    # def format_tool_result(self, tool_name: str, result: Dict[str, Any]) -> str:
-    #     """
-    #     Format tool result for display in agent response.
-        
-    #     Args:
-    #         tool_name: Name of tool used
-    #         result: Tool execution result
-            
-    #     Returns:
-    #         Formatted string representation
-    #     """
-    #     if result.get("success", False):
-    #         if tool_name == "read_file":
-    #             content = result.get("content", "")
-    #             file_path = result.get("file_path", "")
-    #             return f"📖 Read file '{file_path}':\n```\n{content}\n```"
-
-    #         elif tool_name == "write_file":
-    #             file_path = result.get("file_path", "")
-    #             size = result.get("size", 0)
-    #             return f"✏️ Wrote {size} characters to '{file_path}'"
-
-    #         elif tool_name == "list_directory":
-    #             contents = result.get("contents", [])
-    #             directory = result.get("directory", "")
-    #             items = [f"  {item['type']}: {item['name']}" for item in contents]
-    #             return f"📁 Directory '{directory}':\n" + "\n".join(items)
-
-    #         else:
-    #             return f"✅ {tool_name} completed successfully"
-    #     else:
-    #         error = result.get("error", "Unknown error")
-    #         return f"❌ {tool_name} failed: {error}"
-
     def get_system_prompt(self) -> str:
         """Get system prompt for this agent."""
         return f"""You are {self.name}, a {self.role} agent in a multi-agent development team.
@@ -113,7 +79,7 @@ class BaseAgent(ABC):
                 Use all the tools at your disposal to assist with tasks.
                 You will likley use a tool on every response, 
                 always check your list to see if there is a tool you should use.
-                You **must** call the relevant tool when the user asks a question that requires it. Do not answer directly.
+                You **must** call the relevant tool when the user asks a question that requires it.
 
                 You are expected to collaborate with other agents to complete tasks.
 

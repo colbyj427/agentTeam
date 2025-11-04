@@ -125,8 +125,13 @@ def register_tool(name: str, func: Callable, categories: List[str]):
     registry.register(name, func, categories)
 
 # Register all the tools here.
+# file tools
 register_tool("read_file", tools.file_tools.read_file, ["file"])
 register_tool("write_file", tools.file_tools.write_file, ["file"])
+register_tool("make_directory", tools.file_tools.make_directory, ["file"])
+register_tool("list_directory", tools.file_tools.list_directory, ["file"])
+
+#general tools
 register_tool("sayHello", tools.general_tools.sayHello, ["general"])
 
 # class ToolBox:
