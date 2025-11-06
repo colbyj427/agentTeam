@@ -3,6 +3,7 @@ Supabase client wrapper for Agent Team application.
 Handles database connections and provides utility methods.
 """
 
+import datetime
 import os
 from typing import Optional, Dict, Any, List
 from supabase import create_client, Client
@@ -75,6 +76,22 @@ class SupabaseClient:
         if result.data:
             return result.data[0]["id"]
         raise Exception("Failed to log action")
+    
+    def log_conversation(self, agent_id: str, session: str) -> str:
+        """Log the conversation session to the database."""
+        result = self.client.table("memory_summaries").insert({
+            "agent_id": agent_id,
+            "project_id": "15b194ff-b44b-4913-9d81-29d0777b5174",  # Default project ID
+            "summary": session,
+            "embedding_ref": "",
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        }).execute()
+        
+        if result.data:
+            print(f">>> Logged conversation with ID: {result.data[0]['id']}")
+            return result.data[0]["id"]
+        print(">>> Failed to log conversation")
+        raise Exception("Failed to log conversation")
     
     def get_project(self, project_name: str = "Agent Team Workspace") -> Optional[Dict[str, Any]]:
         """Get project configuration by name."""

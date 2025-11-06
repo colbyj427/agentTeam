@@ -5,6 +5,7 @@ Developer Agent - handles coding tasks and file operations.
 import json
 import os
 from typing import Dict, Any, Optional
+from xxlimited import Str
 from openai import OpenAI
 from agents.base_agent import BaseAgent
 from tools.tool_box import ToolBox
@@ -24,6 +25,7 @@ class DeveloperAgent(BaseAgent):
                         Specializes in software development tasks.""",
             tools=tool_box.get_tool_names()
         )
+        self.curr_session = [{"role": "system", "content": self.get_system_prompt()}]
 
         # Initialize OpenAI client
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -38,11 +40,8 @@ class DeveloperAgent(BaseAgent):
 
     async def process_message(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         try:
-            system_prompt = self.get_system_prompt()
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message}
-            ]
+            self.curr_session.append({"role": "user", "content": message})
+            messages = self.curr_session
 
             while True:
                 response = self.openai_client.chat.completions.create(
@@ -79,15 +78,27 @@ class DeveloperAgent(BaseAgent):
                         "name": func_name,
                         "content": json.dumps(result)
                     })
-
+                    self.curr_session = messages  # Update current session
                     continue
 
             # Otherwise, final assistant message
+                self.curr_session.append({"role": "assistant", "content": choice.content or ""})
                 return choice.content or ""
 
         except Exception as e:
             print(f"[Error] process_message failed: {e}")
             return f"Sorry, I encountered an error: {e}"
+        
+    async def summarize_session(self):
+        """Summarize the current conversation session before logging."""
+        # Simple summarization logic (could be improved with LLM)
+        summary = await self.process_message(
+        "Summarize our conversation so far in brief points. Exclude your system prompt," \
+        "and this summary command. Focus on key actions taken and decisions made." \
+        "Write it so that it can be used to recall context later."
+                                       )
+        print(f">>> Summary: {summary}")
+        return summary
 
     def log_action(self, tool_name: str, input_data: Dict[str, Any],
                   output_data: Dict[str, Any], status: str):
@@ -95,3 +106,9 @@ class DeveloperAgent(BaseAgent):
         supabase_client.log_action(
             self.agent_id, tool_name, input_data, output_data, status
         )
+
+    async def log_conversation(self):
+        """Log the current conversation session to the database."""
+        print(">>> Logging conversation...")
+        summary = await self.summarize_session()
+        supabase_client.log_conversation(self.agent_id, summary)

@@ -8,12 +8,14 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from db.supabase_client import supabase_client
 from agents.developer_agent import DeveloperAgent
+from agents.critic_agent import CriticAgent
 
 # Load environment variables
 load_dotenv()
@@ -36,7 +38,7 @@ app.add_middleware(
 
 # Initialize agents
 developer_agent = DeveloperAgent()
-
+critic_agent = CriticAgent()
 # Pydantic models
 class MessageRequest(BaseModel):
     content: str
@@ -78,6 +80,14 @@ async def root():
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "service": "agent-team-api"}
+
+
+class ClientExitEvent(BaseModel):
+    session_id: Optional[str] = None
+    page: Optional[str] = None
+    reason: Optional[str] = None  # e.g., pagehide, beforeunload, visibilitychange
+    timestamp: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 @app.get("/api/agents", response_model=List[AgentInfo])
 async def get_agents():
@@ -136,6 +146,8 @@ async def send_message(request: MessageRequest):
         # Get agent response
         if request.agent_name == "Developer":
             agent_response = await developer_agent.process_message(request.content)
+        elif request.agent_name == "Critic":
+            agent_response = await critic_agent.process_message(request.content)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown agent: {request.agent_name}")
 
@@ -179,12 +191,54 @@ async def get_projects():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get project: {str(e)}")
 
+@app.post("/api/client-exit")
+async def client_exit(request: Request, event: Optional[ClientExitEvent] = None):
+    """Receive a beacon when the user closes the app/tab/window.
+
+    Accepts JSON via sendBeacon or fetch(keepalive). If the Content-Type isn't JSON,
+    attempts to parse the raw body as JSON; otherwise records minimal info.
+    """
+    try:
+        payload: Dict[str, Any] = {}
+        # Prefer parsed pydantic model if provided
+        if event is not None:
+            payload = event.model_dump(exclude_none=True)
+        else:
+            # Try to parse JSON body manually (for text/plain beacons)
+            try:
+                body = await request.body()
+                if body:
+                    import json as _json
+                    payload = _json.loads(body.decode("utf-8"))
+            except Exception:
+                payload = {}
+
+        # Enrich with request context
+        user_agent = request.headers.get("user-agent", "") if request else ""
+        client_host = request.client.host if request and request.client else None
+        payload.setdefault("user_agent", user_agent)
+        if client_host:
+            payload.setdefault("client_ip", client_host)
+
+        # For now, just log to stdout. Optionally, this can be persisted later.
+        print("[client-exit]", payload)
+        # Summarize current conversation sessions.
+        try:
+            await developer_agent.log_conversation()
+        except Exception as e:
+            print(f">>> Failed to log developer conversation: {e}")
+
+        # Return 204 No Content, which is fine for beacon calls
+        from fastapi import Response
+        return Response(status_code=204)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to record client exit: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
-
     host = os.getenv("HOST", "localhost")
     port = int(os.getenv("PORT", 8000))
-
     uvicorn.run(
         "main:app",
         host=host,

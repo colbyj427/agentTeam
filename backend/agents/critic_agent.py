@@ -18,6 +18,7 @@ class CriticAgent(BaseAgent):
             description="An agent that reviews code for quality, style, and potential issues.",
             tools=tool_box.get_tool_names()
         )
+        self.curr_session = [{"role": "system", "content": self.get_system_prompt()}]
 
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -31,11 +32,8 @@ class CriticAgent(BaseAgent):
 
     async def process_message(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         try:
-            system_prompt = self.get_system_prompt()
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": message}
-            ]
+            self.curr_session.append({"role": "user", "content": message})
+            messages = self.curr_session
 
             while True:
                 response = self.openai_client.chat.completions.create(
@@ -72,10 +70,11 @@ class CriticAgent(BaseAgent):
                         "name": func_name,
                         "content": json.dumps(result)
                     })
-
+                    self.curr_session = messages  # Update current session
                     continue
 
             # Otherwise, final assistant message
+                self.curr_session.append({"role": "assistant", "content": choice.content or ""})
                 return choice.content or ""
 
         except Exception as e:

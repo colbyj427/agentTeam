@@ -39,6 +39,12 @@ Start the backend:
 python main.py
 ```
 
+### To Add An Agent
+1. Create a file for the agent in the /backend/agents directory.
+2. Import the agent class at the top of /backend/main.py
+3. Add the agent elif branch to the post api/messages function.
+4. Insert a row for the agent into the supabase table of agents.
+
 ### 3. Frontend Setup
 
 ```bash

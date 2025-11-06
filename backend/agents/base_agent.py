@@ -27,6 +27,7 @@ class BaseAgent(ABC):
         self.description = description
         self.tools = tools
         self.agent_id = str(uuid.uuid4())
+        self.curr_session = []
 
     @abstractmethod
     async def process_message(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
@@ -63,6 +64,14 @@ class BaseAgent(ABC):
             
         Returns:
             Action ID
+        """
+        # This will be implemented by the specific agent subclasses
+        # that have access to the database client
+        pass
+
+    async def log_conversation(self):
+        """
+        Log the current conversation session to the database.
         """
         # This will be implemented by the specific agent subclasses
         # that have access to the database client
