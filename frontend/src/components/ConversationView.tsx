@@ -44,12 +44,20 @@ const ConversationView: React.FC<ConversationViewProps> = ({
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-            {selectedAgent.charAt(0)}
+            {selectedAgent === "Team" ? "👥" : selectedAgent.charAt(0)}
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">{selectedAgent}</h2>
+            <h2 className="text-lg font-semibold text-gray-800">
+              {selectedAgent === "Team" ? "Team Chat" : selectedAgent}
+            </h2>
             <p className="text-sm text-gray-600">
-              {messages.length > 0 ? `${messages.length} messages` : 'Start a conversation'}
+              {selectedAgent === "Team" 
+                ? messages.length > 0 
+                  ? `${messages.length} messages from all agents` 
+                  : 'Chat with all agents together'
+                : messages.length > 0 
+                  ? `${messages.length} messages` 
+                  : 'Start a conversation'}
             </p>
           </div>
         </div>

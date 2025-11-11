@@ -18,6 +18,37 @@ const AgentList: React.FC<AgentListProps> = ({ agents, selectedAgent, onAgentSel
 
       {/* Agent List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Team Chat Option */}
+        <div
+          onClick={() => onAgentSelect("Team")}
+          className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md mb-3 ${
+            selectedAgent === "Team"
+              ? 'border-blue-500 bg-blue-50 shadow-md'
+              : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-start space-x-3">
+            {/* Team Avatar */}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${
+              selectedAgent === "Team" ? 'bg-blue-500' : 'bg-gray-400'
+            }`}>
+              👥
+            </div>
+            
+            {/* Team Info */}
+            <div className="flex-1 min-w-0">
+              <h3 className={`font-medium ${
+                selectedAgent === "Team" ? 'text-blue-900' : 'text-gray-900'
+              }`}>
+                Team Chat
+              </h3>
+              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                Chat with all agents together. See inter-agent conversations and collaborate as a team.
+              </p>
+            </div>
+          </div>
+        </div>
+        
         {agents.map((agent) => (
           <div
             key={agent.id}

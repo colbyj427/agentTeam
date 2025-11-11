@@ -33,8 +33,10 @@ class DeveloperAgent(BaseAgent):
 
         # Get agent ID from database
         agent_data = supabase_client.get_agent("Developer")
+        print(f">>> Developer agent data: {agent_data}")
         if agent_data:
             self.agent_id = agent_data["id"]
+            print(f">>> Developer agent ID: {self.agent_id}")
 
         self.curr_session = []
         self.initialize_context()
@@ -70,6 +72,11 @@ class DeveloperAgent(BaseAgent):
                     print(f">>> Calling {func_name}({args})")
 
                     if func := tool_box.get_tool(func_name):
+                        # Inject context for message_agent tool
+                        if func_name == "message_agent":
+                            thread_id = context.get("thread_id", "") if context else ""
+                            args["thread_id"] = thread_id
+                            args["sender_agent"] = self.name
                         result = await tool_box.run_tool(func_name, **args)
                     else:
                         result = {"error": f"Unknown tool: {func_name}"}

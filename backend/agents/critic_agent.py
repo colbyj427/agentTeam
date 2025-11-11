@@ -30,9 +30,6 @@ class CriticAgent(BaseAgent):
         if agent_data:
             self.agent_id = agent_data["id"]
 
-        self.curr_session = []
-        self.initialize_context()
-
     async def process_message(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         try:
             self.curr_session.append({"role": "user", "content": message})
@@ -62,6 +59,11 @@ class CriticAgent(BaseAgent):
                     print(f">>> Calling {func_name}({args})")
 
                     if func := tool_box.get_tool(func_name):
+                        # Inject context for message_agent tool
+                        if func_name == "message_agent":
+                            thread_id = context.get("thread_id", "") if context else ""
+                            args["thread_id"] = thread_id
+                            args["sender_agent"] = self.name
                         result = await tool_box.run_tool(func_name, **args)
                     else:
                         result = {"error": f"Unknown tool: {func_name}"}
@@ -90,16 +92,6 @@ class CriticAgent(BaseAgent):
         supabase_client.log_action(
             self.agent_id, tool_name, input_data, output_data, status
         )
-
-    def initialize_context(self):
-        """Reset current session with system prompt."""
-        self.curr_session = [{"role": "system", "content": self.get_system_prompt()}]
-        # grab the 5 most recent summaries from db
-        # add them to the curr_session as context (as assistant messages)
-        print(f"agent id in initialize_context: {self.agent_id}")
-        recent_summaries = supabase_client.get_recent_summaries(self.agent_id, limit=5)
-        for summary in recent_summaries:
-            self.curr_session.append({"role": "assistant", "content": summary})
 
     def get_system_prompt(self) -> str:
         """Get system prompt for this agent."""

@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from db.supabase_client import supabase_client
 from agents.developer_agent import DeveloperAgent
 from agents.critic_agent import CriticAgent
+from agents.agent_registry import agent_registry
 
 # Load environment variables
 load_dotenv()
@@ -39,6 +40,10 @@ app.add_middleware(
 # Initialize agents
 developer_agent = DeveloperAgent()
 critic_agent = CriticAgent()
+
+# Register agents in the registry for inter-agent communication
+agent_registry.register("Developer", developer_agent)
+agent_registry.register("Critic", critic_agent)
 # Pydantic models
 class MessageRequest(BaseModel):
     content: str
@@ -112,18 +117,31 @@ async def get_messages(thread_id: Optional[str] = None, limit: int = 50):
     """Get message history."""
     try:
         messages_data = supabase_client.get_messages(thread_id, limit)
-        return [
-            MessageResponse(
+        result = []
+        for msg in messages_data:
+            # Ensure metadata includes thread_id
+            metadata = msg.get("metadata") or {}
+            if isinstance(metadata, str):
+                import json
+                try:
+                    metadata = json.loads(metadata)
+                except:
+                    metadata = {}
+            
+            # Add thread_id to metadata if not present
+            if "thread_id" not in metadata and msg.get("thread_id"):
+                metadata["thread_id"] = msg.get("thread_id")
+            
+            result.append(MessageResponse(
                 id=msg["id"],
                 content=msg["content"],
                 sender=msg["sender"],
                 recipient=msg["recipient"],
                 role=msg["role"],
                 created_at=msg["created_at"],
-                metadata=msg.get("metadata")
-            )
-            for msg in messages_data
-        ]
+                metadata=metadata if metadata else None
+            ))
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get messages: {str(e)}")
 
@@ -131,6 +149,81 @@ async def get_messages(thread_id: Optional[str] = None, limit: int = 50):
 async def send_message(request: MessageRequest):
     """Send a message to an agent and get response."""
     try:
+        # Handle Team chat - use team thread
+        if request.agent_name == "Team":
+            try:
+                # Find or create team thread
+                # Team threads are identified by metadata flag, not by thread_id prefix
+                all_messages = supabase_client.get_messages(thread_id=None, limit=1000)
+                team_thread_id = None
+                
+                # Find existing team thread by checking metadata
+                for msg in all_messages:
+                    metadata = msg.get("metadata") or {}
+                    if isinstance(metadata, str):
+                        import json
+                        try:
+                            metadata = json.loads(metadata)
+                        except:
+                            metadata = {}
+                    
+                    # Check if this is a team thread
+                    if metadata.get("is_team_thread") == True:
+                        tid = msg.get("thread_id")
+                        if tid:
+                            team_thread_id = tid
+                            break
+                    # Also check for threads with inter-agent messages (these are team threads)
+                    elif msg.get("sender") not in ["user"] and msg.get("recipient") not in ["user"]:
+                        tid = msg.get("thread_id")
+                        if tid:
+                            team_thread_id = tid
+                            break
+                
+                # Create new team thread if none exists
+                if not team_thread_id:
+                    team_thread_id = str(uuid.uuid4())
+                
+                # Save user message to team thread with team flag in metadata
+                user_message_id = supabase_client.save_message(
+                    thread_id=team_thread_id,
+                    sender="user",
+                    recipient="Team",
+                    content=request.content,
+                    role="user",
+                    metadata={"is_team_thread": True, "thread_id": team_thread_id}
+                )
+                
+                # For team chat, send to Developer by default (agents can then message each other)
+                context = {"thread_id": team_thread_id}
+                agent_response = await developer_agent.process_message(request.content, context=context)
+                
+                # Save agent response to team thread with team flag in metadata
+                agent_message_id = supabase_client.save_message(
+                    thread_id=team_thread_id,
+                    sender="Developer",
+                    recipient="user",
+                    content=agent_response,
+                    role="assistant",
+                    metadata={"is_team_thread": True, "thread_id": team_thread_id}
+                )
+                
+                return MessageResponse(
+                    id=agent_message_id,
+                    content=agent_response,
+                    sender="Developer",
+                    recipient="user",
+                    role="assistant",
+                    created_at=datetime.now().isoformat(),
+                    metadata={"is_team_thread": True, "thread_id": team_thread_id}
+                )
+            except Exception as team_error:
+                print(f"[Error] Team chat error: {team_error}")
+                import traceback
+                traceback.print_exc()
+                raise HTTPException(status_code=500, detail=f"Team chat error: {str(team_error)}")
+        
+        # Individual agent chat - normal flow
         # Generate thread ID if not provided
         thread_id = request.thread_id or str(uuid.uuid4())
 
@@ -143,11 +236,12 @@ async def send_message(request: MessageRequest):
             role="user"
         )
 
-        # Get agent response
+        # Get agent response (pass thread_id in context for inter-agent messaging)
+        context = {"thread_id": thread_id}
         if request.agent_name == "Developer":
-            agent_response = await developer_agent.process_message(request.content)
+            agent_response = await developer_agent.process_message(request.content, context=context)
         elif request.agent_name == "Critic":
-            agent_response = await critic_agent.process_message(request.content)
+            agent_response = await critic_agent.process_message(request.content, context=context)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown agent: {request.agent_name}")
 

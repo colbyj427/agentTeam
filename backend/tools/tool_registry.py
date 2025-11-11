@@ -133,6 +133,7 @@ register_tool("list_directory", tools.file_tools.list_directory, ["file"])
 
 #general tools
 register_tool("sayHello", tools.general_tools.sayHello, ["general"])
+register_tool("message_agent", tools.general_tools.message_agent, ["general"])
 
 # class ToolBox:
 #     _tools: list[dict[str, Any]]

@@ -43,33 +43,83 @@ function App() {
     setIsLoading(true);
     
     try {
-      // Add user message to UI immediately
-      const userMessage: Message = {
-        id: `temp-${Date.now()}`,
-        content: content.trim(),
-        sender: 'user',
-        recipient: selectedAgent,
-        role: 'user',
-        created_at: new Date().toISOString(),
-        metadata: { thread_id: currentThreadId }
-      };
-      
-      setMessages(prev => [...prev, userMessage]);
+      // For Team chat, we need special handling
+      if (selectedAgent === "Team") {
+        const userMessage: Message = {
+          id: `temp-${Date.now()}`,
+          content: content.trim(),
+          sender: 'user',
+          recipient: 'Team',
+          role: 'user',
+          created_at: new Date().toISOString(),
+          metadata: { thread_id: currentThreadId }
+        };
+        
+        setMessages(prev => [...prev, userMessage]);
 
-      // Send to API
-      const response = await messageApi.sendMessage({
-        content: content.trim(),
-        thread_id: currentThreadId,
-        agent_name: selectedAgent
-      });
+        // Send to API with Team as agent_name
+        const response = await messageApi.sendMessage({
+          content: content.trim(),
+          thread_id: currentThreadId,
+          agent_name: "Team"
+        });
 
-      // Update thread ID if this is a new conversation
-      if (!currentThreadId && response.metadata?.thread_id) {
-        setCurrentThreadId(response.metadata.thread_id);
+        // Update thread ID if this is a new conversation
+        if (!currentThreadId && response.metadata?.thread_id) {
+          setCurrentThreadId(response.metadata.thread_id);
+        }
+
+        // Add agent response to messages
+        setMessages(prev => [...prev, response]);
+        
+        // Refresh messages to get all team messages including inter-agent conversations
+        if (currentThreadId || response.metadata?.thread_id) {
+          const threadId = currentThreadId || response.metadata?.thread_id;
+          const threadMessages = await messageApi.getMessages(threadId);
+          const sortedMessages = threadMessages.sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          setMessages(sortedMessages);
+        }
+      } else {
+        // Individual agent chat - normal flow
+        const userMessage: Message = {
+          id: `temp-${Date.now()}`,
+          content: content.trim(),
+          sender: 'user',
+          recipient: selectedAgent,
+          role: 'user',
+          created_at: new Date().toISOString(),
+          metadata: { thread_id: currentThreadId }
+        };
+        
+        setMessages(prev => [...prev, userMessage]);
+
+        // Send to API
+        const response = await messageApi.sendMessage({
+          content: content.trim(),
+          thread_id: currentThreadId,
+          agent_name: selectedAgent
+        });
+
+        // Update thread ID if this is a new conversation
+        if (!currentThreadId && response.metadata?.thread_id) {
+          setCurrentThreadId(response.metadata.thread_id);
+        }
+
+        // Add agent response to messages
+        setMessages(prev => [...prev, response]);
+        
+        // Refresh messages to get any inter-agent messages that may have been created
+        if (currentThreadId || response.metadata?.thread_id) {
+          const threadId = currentThreadId || response.metadata?.thread_id;
+          const threadMessages = await messageApi.getMessages(threadId);
+          const sortedMessages = threadMessages.sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          setMessages(sortedMessages);
+        }
       }
-
-      // Add agent response to messages
-      setMessages(prev => [...prev, response]);
       
     } catch (error) {
       console.error('Failed to send message:', error);
@@ -85,22 +135,68 @@ function App() {
     setIsLoading(true);
     
     try {
-      // Load message history for this agent
-      const messagesData = await messageApi.getMessages();
-      
-      // Filter messages for this specific agent and sort by timestamp
-      const agentMessages = messagesData
-        .filter(msg => msg.sender === agentName || msg.recipient === agentName)
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-      
-      setMessages(agentMessages);
-      
-      // Set thread ID from the most recent message if available
-      if (agentMessages.length > 0) {
-        const latestMessage = agentMessages[agentMessages.length - 1];
-        setCurrentThreadId(latestMessage.metadata?.thread_id);
+      // For individual agent chats, only show messages between user and that agent
+      // For Team chat, show all messages from all agents in team thread
+      if (agentName === "Team") {
+        // Load all messages and find team threads
+        const messagesData = await messageApi.getMessages();
+        
+        // Find team threads (threads with is_team_thread flag or inter-agent messages)
+        let teamThreadId: string | undefined = undefined;
+        
+        for (const msg of messagesData) {
+          const metadata = msg.metadata || {};
+          // Check if this is a team thread
+          if (metadata.is_team_thread === true) {
+            const tid = metadata.thread_id;
+            if (tid) {
+              teamThreadId = tid;
+              break;
+            }
+          }
+          // Also check for threads with inter-agent messages (these are team threads)
+          if (msg.sender !== "user" && msg.recipient !== "user") {
+            const tid = metadata.thread_id;
+            if (tid) {
+              teamThreadId = tid;
+              break;
+            }
+          }
+        }
+        
+        if (teamThreadId) {
+          // Load all messages from the team thread
+          const allTeamMessages = await messageApi.getMessages(teamThreadId);
+          const sortedMessages = allTeamMessages.sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          setMessages(sortedMessages);
+          setCurrentThreadId(teamThreadId);
+        } else {
+          setMessages([]);
+          setCurrentThreadId(undefined);
+        }
       } else {
-        setCurrentThreadId(undefined);
+        // Individual agent chat - only show messages between user and this agent
+        const messagesData = await messageApi.getMessages();
+        
+        // Filter messages for this specific agent and sort by timestamp
+        const agentMessages = messagesData
+          .filter(msg => 
+            (msg.sender === agentName && msg.recipient === "user") ||
+            (msg.sender === "user" && msg.recipient === agentName)
+          )
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        
+        setMessages(agentMessages);
+        
+        // Set thread ID from the most recent message if available
+        if (agentMessages.length > 0) {
+          const latestMessage = agentMessages[agentMessages.length - 1];
+          setCurrentThreadId(latestMessage.metadata?.thread_id);
+        } else {
+          setCurrentThreadId(undefined);
+        }
       }
     } catch (error) {
       console.error('Failed to load agent messages:', error);
