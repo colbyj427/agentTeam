@@ -97,6 +97,18 @@ class SupabaseClient:
         """Get project configuration by name."""
         result = self.client.table("projects").select("*").eq("name", project_name).execute()
         return result.data[0] if result.data else None
+    
+    def get_recent_summaries(self, agent_id: str, limit: int = 5) -> List[str]:
+        """Get recent memory summaries for an agent."""
+        try:
+            result = self.client.table("memory_summaries").select("*")\
+                .eq("agent_id", agent_id)\
+                .order("created_at", desc=True).limit(limit).execute()
+        except Exception as e:
+            print(f"[Error] get_recent_summaries failed: {e}")
+            return []
+        summaries = [r["summary"] for r in result.data] if result.data else []
+        return summaries
 
 # Global instance
 supabase_client = SupabaseClient()

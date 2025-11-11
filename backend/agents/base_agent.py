@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional
 import json
 import uuid
 from datetime import datetime
+from db.supabase_client import supabase_client
 
 class BaseAgent(ABC):
     """Abstract base class for all agents."""
@@ -95,3 +96,7 @@ class BaseAgent(ABC):
                 You can help with development tasks, file operations, and code analysis. 
                 When you need to use tools, explain what you're doing and show the results.
                 Always be helpful and provide clear, actionable responses."""
+
+    def initialize_context(self):
+        """Reset current session with system prompt."""
+        pass

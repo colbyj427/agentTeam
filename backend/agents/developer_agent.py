@@ -25,8 +25,6 @@ class DeveloperAgent(BaseAgent):
                         Specializes in software development tasks.""",
             tools=tool_box.get_tool_names()
         )
-        self.curr_session = [{"role": "system", "content": self.get_system_prompt()}]
-
         # Initialize OpenAI client
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -37,6 +35,11 @@ class DeveloperAgent(BaseAgent):
         agent_data = supabase_client.get_agent("Developer")
         if agent_data:
             self.agent_id = agent_data["id"]
+
+        self.curr_session = []
+        self.initialize_context()
+
+        return None
 
     async def process_message(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         try:
@@ -110,5 +113,19 @@ class DeveloperAgent(BaseAgent):
     async def log_conversation(self):
         """Log the current conversation session to the database."""
         print(">>> Logging conversation...")
+        if len(self.curr_session) == 1:
+            print(">>> No conversation to log.")
+            return
         summary = await self.summarize_session()
         supabase_client.log_conversation(self.agent_id, summary)
+        self.initialize_context()
+
+    def initialize_context(self):
+        """Reset current session with system prompt."""
+        self.curr_session = [{"role": "system", "content": self.get_system_prompt()}]
+        # grab the 5 most recent summaries from db
+        # add them to the curr_session as context (as assistant messages)
+        print(f"agent id in initialize_context: {self.agent_id}")
+        recent_summaries = supabase_client.get_recent_summaries(self.agent_id, limit=5)
+        for summary in recent_summaries:
+            self.curr_session.append({"role": "assistant", "content": summary})
