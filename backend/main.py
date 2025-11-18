@@ -41,7 +41,7 @@ app.add_middleware(
 # Initialize agents
 developer_agent = DeveloperAgent()
 critic_agent = CriticAgent()
-rag_agent = RAGAgent()
+#rag_agent = RAGAgent()
 
 class AgentInfo(BaseModel):
     id: str
