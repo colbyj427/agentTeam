@@ -4,6 +4,7 @@ from types import UnionType
 from typing import Any, Callable, Dict, List, get_type_hints, Literal, get_origin, get_args, Union
 import tools.file_tools
 import tools.general_tools
+import tools.rag_tools
 
 # from openai.types.responses import FunctionToolParam
 
@@ -133,54 +134,7 @@ register_tool("list_directory", tools.file_tools.list_directory, ["file"])
 
 #general tools
 register_tool("sayHello", tools.general_tools.sayHello, ["general"])
+register_tool("sendAgentMessage", tools.general_tools.sendAgentMessage, ["general"])
 
-# class ToolBox:
-#     _tools: list[dict[str, Any]]
-
-#     def __init__(self):
-#         self._funcs = {}
-#         self._tools = []
-
-#     def tool(self, func):
-#         self._tools.append(generate_function_schema(func))
-
-#         if inspect.iscoroutinefunction(func):
-#             async def _safe_func_async(*args, **kwargs):
-#                 try:
-#                     return await func(*args, **kwargs)
-#                 except Exception:
-#                     return traceback.format_exc()
-#             safe_func = _safe_func_async
-#         else:
-#             def _safe_func_sync(*args, **kwargs):
-#                 try:
-#                     return func(*args, **kwargs)
-#                 except Exception:
-#                     return traceback.format_exc()
-#             safe_func = _safe_func_sync
-
-#         self._funcs[func.__name__] = safe_func
-#         return func
-
-#     def get_tools(self):
-#         result = []
-#         for tool in self._tools:
-#             result.append(tool["name"])
-#         return result
-
-#     def get_tool(self, tool_name: str):
-#         try:
-#             return _tools[tool_name]
-#         except:
-#             return f"Tool: {tool_name} is not in the toolbox."
-
-#     async def run_tool(self, tool_name: str, **kwargs):
-#         tool = self._funcs.get(tool_name)
-#         if tool is None:
-#             return f"Tool: {tool_name} is not in the toolbox."
-#         result = tool(**kwargs)
-#         if inspect.iscoroutine(result):
-#             return await result
-#         else:
-#             return result
-        
+# RAG tools
+register_tool("rag_search", tools.rag_tools.rag_search, ["rag"])

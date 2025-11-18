@@ -12,10 +12,12 @@ from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from messageStructures import MessageRequest, MessageResponse
 
 from db.supabase_client import supabase_client
 from agents.developer_agent import DeveloperAgent
 from agents.critic_agent import CriticAgent
+from agents.rag_agent import RAGAgent
 
 # Load environment variables
 load_dotenv()
@@ -39,20 +41,7 @@ app.add_middleware(
 # Initialize agents
 developer_agent = DeveloperAgent()
 critic_agent = CriticAgent()
-# Pydantic models
-class MessageRequest(BaseModel):
-    content: str
-    thread_id: Optional[str] = None
-    agent_name: str = "Developer"
-
-class MessageResponse(BaseModel):
-    id: str
-    content: str
-    sender: str
-    recipient: str
-    role: str
-    created_at: str
-    metadata: Optional[Dict[str, Any]] = None
+rag_agent = RAGAgent()
 
 class AgentInfo(BaseModel):
     id: str
@@ -148,6 +137,8 @@ async def send_message(request: MessageRequest):
             agent_response = await developer_agent.process_message(request.content)
         elif request.agent_name == "Critic":
             agent_response = await critic_agent.process_message(request.content)
+        elif request.agent_name == "RAG":
+            agent_response = await rag_agent.process_message(request.content)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown agent: {request.agent_name}")
 

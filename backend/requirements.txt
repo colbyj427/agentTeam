@@ -1,0 +1,3 @@
+# Minimal backend requirements
+# Add other pinned dependencies here as needed
+pydantic-settings

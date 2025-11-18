@@ -100,6 +100,11 @@ agent-team/
 └── workspace/                    # Agent workspace
 ```
 
+## For Distributed Use
+- Need a script to initialize agents in database
+- Need a script to initialize RAG database or a way to give a premade one to the RAG agent.
+- Need a requirements.txt
+
 ## 🎯 Week 1 Features
 
 - ✅ **Messaging Interface** - Chat with AI agents
