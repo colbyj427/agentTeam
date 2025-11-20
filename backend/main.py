@@ -18,6 +18,8 @@ from db.supabase_client import supabase_client
 from agents.developer_agent import DeveloperAgent
 from agents.critic_agent import CriticAgent
 from agents.rag_agent import RAGAgent
+from agents.frontend_agent import FrontendAgent
+from agents.backend_agent import BackendAgent
 
 # Load environment variables
 load_dotenv()
@@ -40,6 +42,8 @@ app.add_middleware(
 
 # Initialize agents
 developer_agent = DeveloperAgent()
+frontend_agent = FrontendAgent()
+backend_agent = BackendAgent()
 critic_agent = CriticAgent()
 #rag_agent = RAGAgent()
 
@@ -137,8 +141,12 @@ async def send_message(request: MessageRequest):
             agent_response = await developer_agent.process_message(request.content)
         elif request.agent_name == "Critic":
             agent_response = await critic_agent.process_message(request.content)
-        elif request.agent_name == "RAG":
-            agent_response = await rag_agent.process_message(request.content)
+        # elif request.agent_name == "RAG":
+        #     agent_response = await rag_agent.process_message(request.content)
+        elif request.agent_name == "Frontend":
+            agent_response = await frontend_agent.process_message(request.content)
+        elif request.agent_name == "Backend":
+            agent_response = await backend_agent.process_message(request.content)
         else:
             raise HTTPException(status_code=400, detail=f"Unknown agent: {request.agent_name}")
 
